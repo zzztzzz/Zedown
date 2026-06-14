@@ -1,0 +1,18 @@
+# --- secrets / signing keys (NEVER commit) ---
+*.pem
+extension.pem
+
+# --- build artifacts ---
+*.crx
+extension.crx
+
+# --- editor / tooling ---
+.idea/
+.vscode/
+.claude/
+
+# --- OS / misc ---
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
