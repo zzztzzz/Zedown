@@ -47,6 +47,7 @@
   // references rebuilt each render
   let textareaEl = null;
   let clipToast = '';       // transient "已剪藏" header state
+  let clipReason = '';      // failure reason text (shown on fail)
   let clipTimer = null;
 
   // ── persistence: debounced autosave ────────────────────────────
@@ -97,11 +98,13 @@
   }
 
   // ── 剪藏 transient state ────────────────────────────────────────
-  function showClip(state) {
+  function showClip(state, reason) {
     clipToast = state;
+    clipReason = reason || '';
     render();
     if (clipTimer) clearTimeout(clipTimer);
-    clipTimer = setTimeout(function () { clipToast = ''; render(); }, 1600);
+    // keep failures visible longer so the reason can be read
+    clipTimer = setTimeout(function () { clipToast = ''; clipReason = ''; render(); }, state === 'fail' ? 8000 : 1600);
   }
 
   // ── textarea editing primitives (caret-aware) ──────────────────
@@ -442,10 +445,13 @@
         // empty pages can't be clipped, so don't claim success blindly.
         try {
           chrome.runtime.sendMessage({ type: 'clip-page' }, function (res) {
-            if (chrome.runtime.lastError || !res || !res.ok) showClip('fail');
-            else showClip('done');
+            const le = chrome.runtime.lastError;
+            if (le) { showClip('fail', '消息未送达后台：' + le.message); return; }
+            if (!res) { showClip('fail', '后台无响应'); return; }
+            if (!res.ok) { showClip('fail', res.error || '未知错误'); return; }
+            showClip('done');
           });
-        } catch (e) { showClip('fail'); }
+        } catch (e) { showClip('fail', String((e && e.message) || e)); }
       },
       style: {
         display: 'flex', alignItems: 'center', gap: '5px',
@@ -611,7 +617,18 @@
       },
     }, dot, statusLabel, h('div', { style: { flex: 1 } }), hint);
 
-    root.append(header, tabs, body, toolbar || document.createComment('no-toolbar'), footer);
+    // failure reason banner (剪藏失败的具体原因)
+    const failBanner = (clipFailed && clipReason)
+      ? h('div', {
+          style: {
+            padding: '6px 13px', background: '#fdecea', color: '#a3271c',
+            fontSize: '11px', lineHeight: 1.4, borderBottom: '1px solid #f0c8c2',
+            flex: '0 0 auto', wordBreak: 'break-word',
+          },
+        }, '剪藏失败：' + clipReason)
+      : null;
+
+    root.append(header, failBanner || document.createComment('no-fail'), tabs, body, toolbar || document.createComment('no-toolbar'), footer);
 
     if (restore && textareaEl) {
       textareaEl.focus();

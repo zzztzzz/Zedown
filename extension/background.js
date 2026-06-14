@@ -58,17 +58,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // ---- whole-page clip (V2) ----
   if (msg.type !== 'clip-page') return;
   (async () => {
-    let tabId = sender && sender.tab && sender.tab.id;
-    if (tabId == null) {
-      const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      tabId = active && active.id;
-    }
-    if (tabId == null) { sendResponse({ ok: false, error: 'no-tab' }); return; }
     try {
-      const res = await clipTab(tabId);
+      let tab = sender && sender.tab;
+      if (!tab || tab.id == null) {
+        const r1 = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        tab = r1[0];
+        if (!tab) { const r2 = await chrome.tabs.query({ active: true, currentWindow: true }); tab = r2[0]; }
+      }
+      if (!tab || tab.id == null) { sendResponse({ ok: false, error: '找不到当前标签页' }); return; }
+      const url = tab.url || '';
+      if (!/^https?:\/\//i.test(url)) {
+        sendResponse({ ok: false, error: '此页面无法剪藏（仅支持普通网页 http/https，不支持 chrome:// / 应用商店 / 本地文件等）' });
+        return;
+      }
+      const res = await clipTab(tab.id);
       sendResponse({ ok: true, name: res && res.name });
     } catch (e) {
-      sendResponse({ ok: false, error: String(e && e.message || e) });
+      sendResponse({ ok: false, error: String((e && e.message) || e) });
     }
   })();
   return true; // keep the message channel open for the async response
