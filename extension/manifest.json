@@ -25,6 +25,19 @@
     "default_path": "sidepanel/sidepanel.html"
   },
   "permissions": ["sidePanel", "storage", "contextMenus", "scripting", "activeTab"],
+  "content_scripts": [
+    {
+      "matches": [
+        "file:///*.md", "file:///*.MD", "file:///*.markdown", "file:///*.Markdown",
+        "file:///*.mkd", "file:///*.mdown", "file:///*.mdwn", "file:///*.mkdn"
+      ],
+      "js": [
+        "lib/md.js", "lib/highlight.js", "lib/themes.js", "lib/sample.js",
+        "lib/enhance.js", "lib/reader-view.js", "content/mdview.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
   "commands": {
     "open-panel": {
       "suggested_key": { "default": "Alt+Shift+M", "mac": "Alt+Shift+M" },
