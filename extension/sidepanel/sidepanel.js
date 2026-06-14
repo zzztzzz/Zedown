@@ -664,6 +664,22 @@
     render();
     window.MDStore.onChange(handleChange);
     document.addEventListener('keydown', onKeydown);
+    connectToggle();
+  }
+
+  // Open/close toggle support: hold a port to the service worker while the panel
+  // is open. The SW uses the port's presence to know the panel is open (so the
+  // keyboard command can close it) and tells us to self-close via window.close().
+  function connectToggle() {
+    try {
+      const port = chrome.runtime.connect({ name: 'zedown-sidepanel' });
+      port.onMessage.addListener(function (m) { if (m && m.type === 'close-panel') window.close(); });
+      if (chrome.windows && chrome.windows.getCurrent) {
+        chrome.windows.getCurrent(function (w) {
+          try { if (w) port.postMessage({ type: 'hello', windowId: w.id }); } catch (e) {}
+        });
+      }
+    } catch (e) { /* runtime unavailable */ }
   }
 
   start();

@@ -28,7 +28,11 @@
   "commands": {
     "open-panel": {
       "suggested_key": { "default": "Alt+Shift+M", "mac": "Alt+Shift+M" },
-      "description": "打开 Zedown 侧边栏速记"
+      "description": "开关 Zedown 侧边栏速记"
+    },
+    "open-editor": {
+      "suggested_key": { "default": "Alt+Shift+E", "mac": "Alt+Shift+E" },
+      "description": "打开 Zedown 全屏编辑器"
     }
   },
   "content_security_policy": {

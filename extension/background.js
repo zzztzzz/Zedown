@@ -74,19 +74,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // keep the message channel open for the async response
 });
 
-// Keyboard command opens the side panel on the right (a command counts as the
-// required user gesture for chrome.sidePanel.open). Falls back to querying the
-// active window if the listener's tab is unavailable.
+// Track open side panels by window via a port the panel holds while open.
+// Lets the keyboard command TOGGLE the panel (Chrome has no sidePanel.close()).
+const panelPorts = new Map(); // windowId -> port
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'zedown-sidepanel') return;
+  let wid = null;
+  port.onMessage.addListener((m) => {
+    if (m && m.type === 'hello') { wid = m.windowId; panelPorts.set(wid, port); }
+  });
+  port.onDisconnect.addListener(() => {
+    if (wid != null && panelPorts.get(wid) === port) panelPorts.delete(wid);
+  });
+});
+
+// Keyboard commands (a command is a valid user gesture for sidePanel.open).
+//  - open-panel:  toggle the side panel for the active window.
+//  - open-editor: open the full editor in a new tab.
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (command !== 'open-panel') return;
-  try {
-    let windowId = tab && tab.windowId;
-    if (windowId == null) {
-      const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      windowId = active && active.windowId;
+  let windowId = tab && tab.windowId;
+  if (windowId == null) {
+    const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    windowId = active && active.windowId;
+  }
+  if (command === 'open-panel') {
+    const port = windowId != null ? panelPorts.get(windowId) : null;
+    if (port) {
+      try { port.postMessage({ type: 'close-panel' }); } catch (e) { /* stale port */ }
+    } else {
+      try { if (windowId != null) await chrome.sidePanel.open({ windowId }); } catch (e) {}
     }
-    if (windowId != null) await chrome.sidePanel.open({ windowId });
-  } catch (e) { /* side panel API unavailable / no gesture */ }
+  } else if (command === 'open-editor') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('editor/editor.html') });
+  }
 });
 
 // ---- selection capture (upgraded: capture HTML when possible) ----
