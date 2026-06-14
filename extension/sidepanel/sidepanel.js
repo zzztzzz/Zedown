@@ -674,8 +674,14 @@
     try {
       const port = chrome.runtime.connect({ name: 'zedown-sidepanel' });
       port.onMessage.addListener(function (m) { if (m && m.type === 'close-panel') window.close(); });
+      // Read lastError on disconnect so a transient "receiving end does not
+      // exist" (SW restarting / dev reload) doesn't surface as an unchecked
+      // runtime.lastError warning. The panel still works; the command falls
+      // back to sidePanel.open() when no live port is registered.
+      port.onDisconnect.addListener(function () { void chrome.runtime.lastError; });
       if (chrome.windows && chrome.windows.getCurrent) {
         chrome.windows.getCurrent(function (w) {
+          if (chrome.runtime.lastError) return;
           try { if (w) port.postMessage({ type: 'hello', windowId: w.id }); } catch (e) {}
         });
       }

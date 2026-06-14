@@ -36,7 +36,14 @@
       themeId: themeId,
       content: note.content,
       title: note.title,
-      onEdit: function () { MDStore.openEditor(id || undefined); },
+      // Real tree note → open it for editing. Transient (dropped) doc → it
+      // isn't in Zedown yet, so the button says 导入并编辑: one click imports it
+      // as a new note and opens THAT note in the editor (no native dialog).
+      onEdit: id
+        ? function () { MDStore.openEditor(id); }
+        : function () { importAndEdit(note); },
+      editLabel: id ? '编辑' : '导入并编辑',
+      editTitle: id ? '在读写编辑器中打开' : '导入为 Zedown 笔记并编辑（当前为只读预览）',
       onTheme: function (newId) {
         if (newId === appliedTheme) return;
         appliedTheme = newId;
@@ -46,6 +53,23 @@
         MDStore.setTheme(newId);
       },
     });
+  }
+
+  // Import a transient (dropped) doc into Zedown as a new note, then edit it.
+  // No confirm dialog — the button itself reads 导入并编辑, so the action is clear.
+  async function importAndEdit(note) {
+    const id = 'imp' + Date.now() + Math.random().toString(36).slice(2, 5);
+    const file = {
+      id: id, type: 'file',
+      name: (note.title || '未命名.md'),
+      tag: '导入', updated: '刚刚', body: note.content || '',
+    };
+    try {
+      const tree = await MDStore.getTree();
+      await MDStore.setTree(MDStore.addToFolder(tree, null, file));
+      await MDStore.setActive(id);
+    } catch (e) { /* fall through to open editor anyway */ }
+    MDStore.openEditor(id);
   }
 
   // ── drag & drop: drop a .md/.markdown/.txt file anywhere to read it ──

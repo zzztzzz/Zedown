@@ -10,6 +10,8 @@
      content,            // markdown string
      title,              // document title
      onEdit,             // optional cb -> shows the 编辑 button
+     editLabel,          // optional label for that button (default '编辑')
+     editTitle,          // optional tooltip for that button
      onTheme,            // optional cb(id) -> shows the 3 theme dots
    }
 */
@@ -159,7 +161,7 @@
 
       if (onEdit) {
         const editBtn = h('button', {
-          title: '在读写编辑器中打开',
+          title: opts.editTitle || '在读写编辑器中打开',
           onClick: function () { onEdit(); },
           style: {
             border: 'none', background: t.accent, color: t.accentText, cursor: 'pointer',
@@ -167,7 +169,7 @@
             fontWeight: '700', fontFamily: t.fontUI, display: 'flex',
             alignItems: 'center', gap: '6px',
           },
-        }, h('span', { style: { fontSize: '13px' } }, '✎'), ' 编辑');
+        }, h('span', { style: { fontSize: '13px' } }, '✎'), ' ' + (opts.editLabel || '编辑'));
         topChildren.push(editBtn);
       }
 
