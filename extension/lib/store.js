@@ -13,7 +13,7 @@
      folder { id, type:'folder', name, open, children:[] }
 */
 (function () {
-  const K = { tree: 'md:tree', theme: 'md:theme', active: 'md:active', scratch: 'md:scratch', trash: 'md:trash' };
+  const K = { tree: 'md:tree', theme: 'md:theme', active: 'md:active', scratch: 'md:scratch', trash: 'md:trash', dropdoc: 'md:dropdoc' };
 
   // chrome.storage may be absent when a page is opened outside the extension
   // (e.g. file://). Fall back to localStorage so the surfaces still render.
@@ -201,6 +201,10 @@
     // trash (回收站)
     getTrash: () => get(K.trash, []),
     setTrash: (arr) => rawSet({ [K.trash]: arr }),
+    // dropped doc (拖放到浏览器 → 阅读): transient handoff to the reader tab
+    getDropDoc: () => get(K.dropdoc, null),
+    setDropDoc: (doc) => rawSet({ [K.dropdoc]: doc }),
+    clearDropDoc: () => rawSet({ [K.dropdoc]: null }),
 
     init,
     findNode, patchNode, removeNode, addToFolder, firstFile, flatFiles,
@@ -222,6 +226,10 @@
     openReader(id) {
       const url = chrome.runtime.getURL('reader/reader.html') + (id ? '?id=' + encodeURIComponent(id) : '');
       chrome.tabs.create({ url });
+    },
+    // Open the reader for a doc previously stashed via setDropDoc().
+    openReaderDrop() {
+      chrome.tabs.create({ url: chrome.runtime.getURL('reader/reader.html') + '?src=drop' });
     },
   };
 

@@ -1848,4 +1848,36 @@
   }
 
   main();
+
+  // ── drag a file onto the editor → open it in reading mode (new reader tab) ──
+  (function wireDropToReader() {
+    const RE = /\.(md|markdown|txt|mdown|mkd)$/i;
+    let ov = null;
+    function overlay(show) {
+      if (!ov) {
+        ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(20,18,16,.55);backdrop-filter:blur(3px);font-family:system-ui,sans-serif;pointer-events:none;';
+        const b = document.createElement('div');
+        b.style.cssText = 'padding:26px 38px;border:2px dashed rgba(255,255,255,.7);border-radius:16px;color:#fff;font-size:17px;font-weight:600;text-align:center;';
+        b.textContent = '松开以在阅读模式中打开';
+        ov.appendChild(b);
+        document.body.appendChild(ov);
+      }
+      ov.style.display = show ? 'flex' : 'none';
+    }
+    function hasFiles(e) { return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') > -1; }
+    window.addEventListener('dragenter', function (e) { if (hasFiles(e)) { e.preventDefault(); overlay(true); } });
+    window.addEventListener('dragover', function (e) { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; overlay(true); } });
+    window.addEventListener('dragleave', function (e) { if (e.relatedTarget === null) overlay(false); });
+    window.addEventListener('drop', async function (e) {
+      if (!hasFiles(e)) return;
+      e.preventDefault(); overlay(false);
+      const list = Array.prototype.slice.call(e.dataTransfer.files || []);
+      if (!list.length) return;
+      const f = list.filter(function (x) { return RE.test(x.name); })[0] || list[0];
+      let text = '';
+      try { text = await f.text(); } catch (err) { return; }
+      try { await window.MDStore.setDropDoc({ name: f.name || '拖入的文档', body: text }); window.MDStore.openReaderDrop(); } catch (err) {}
+    });
+  })();
 })();
