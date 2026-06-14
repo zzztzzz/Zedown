@@ -720,7 +720,11 @@
           h('button', {
             title: '重命名', style: iconBtn(t),
             onclick: function (e) { e.stopPropagation(); startRename(n.id, n.name); },
-          }, '✎')
+          }, '✎'),
+          h('button', {
+            title: '删除文件夹（含内容，移入回收站）', style: iconBtn(t),
+            onclick: function (e) { e.stopPropagation(); del(n.id); },
+          }, '✕')
         );
         const label = (S.renaming === n.id)
           ? renameInput(t)
