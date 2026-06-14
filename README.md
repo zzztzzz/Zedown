@@ -88,4 +88,4 @@ extension/
 
 ## 设计来源
 
-`design-src/` 保存了从设计稿解包出的原始 React 原型（`MDApp.jsx`、各 `comp_*.jsx`、`helper_*.js`），作为还原实现的参照。生产扩展为其无框架、可直接加载的等价实现。
+`design/` 保存了设计来源：V1/V2/V3 三个设计稿（打包 HTML），以及 `design/design-src/`（从 V1 解包出的原始 React 原型 `MDApp.jsx`、各 `comp_*.jsx`、`helper_*.js`）。生产扩展为其无框架、可直接加载的等价实现。
