@@ -107,6 +107,58 @@
     clipTimer = setTimeout(function () { clipToast = ''; clipReason = ''; render(); }, state === 'fail' ? 8000 : 1600);
   }
 
+  // Clip the active tab DIRECTLY from the side panel (no background round-trip):
+  // inject content/extract.js into the page, get { title, url, markdown }, then
+  // append a note under the 网页剪藏 folder. Avoids the messaging failure mode.
+  async function clipPageNow() {
+    let tab;
+    try {
+      const r1 = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      tab = r1 && r1[0];
+      if (!tab) { const r2 = await chrome.tabs.query({ active: true, currentWindow: true }); tab = r2 && r2[0]; }
+    } catch (e) { /* ignore */ }
+    if (!tab || tab.id == null) { showClip('fail', '找不到当前标签页'); return; }
+    if (!/^https?:\/\//i.test(tab.url || '')) {
+      showClip('fail', '此页面无法剪藏（仅支持普通网页 http/https；chrome:// / 应用商店 / 本地文件 / 新标签页不行）');
+      return;
+    }
+    let data;
+    try {
+      const r = await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content/extract.js'] });
+      data = r && r[0] && r[0].result;
+    } catch (e) {
+      showClip('fail', '无法读取此页面：' + ((e && e.message) || e));
+      return;
+    }
+    if (!data || !data.markdown) { showClip('fail', '未提取到正文内容'); return; }
+    try {
+      await appendClipNote(data);
+      showClip('done');
+    } catch (e) { showClip('fail', '保存失败：' + ((e && e.message) || e)); }
+  }
+
+  async function appendClipNote(data) {
+    const title = ((data.title || '未命名') + '').trim() || '未命名';
+    const url = data.url || '';
+    let domain = '网页';
+    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch (e) { /* keep default */ }
+    const ts = Date.now();
+    let tree = await window.MDStore.getTree();
+    if (!Array.isArray(tree)) tree = [];
+    const file = {
+      id: 'clip' + ts, type: 'file', name: (title.slice(0, 40) || '剪藏') + '.md',
+      tag: domain, updated: '刚刚',
+      body: '# ' + title + '\n\n> 来源: ' + url + '\n\n' + (data.markdown || ''),
+    };
+    let next;
+    if (window.MDStore.findNode(tree, 'clip-web')) {
+      next = window.MDStore.addToFolder(tree, 'clip-web', file);
+    } else {
+      next = tree.concat([{ id: 'clip-web', type: 'folder', name: '网页剪藏', open: true, children: [file] }]);
+    }
+    await window.MDStore.setTree(next);
+  }
+
   // ── textarea editing primitives (caret-aware) ──────────────────
   // Apply a value+caret change to the textarea + module state in one place.
   function setEditor(value, selStart, selEnd) {
@@ -440,19 +492,7 @@
     const clipColor = clipFailed ? '#c0392b' : t.accent;
     const clipBtn = h('button', {
       title: '剪藏当前网页到笔记',
-      onclick: function () {
-        // Branch on the background's actual result — chrome:// / web-store /
-        // empty pages can't be clipped, so don't claim success blindly.
-        try {
-          chrome.runtime.sendMessage({ type: 'clip-page' }, function (res) {
-            const le = chrome.runtime.lastError;
-            if (le) { showClip('fail', '消息未送达后台：' + le.message); return; }
-            if (!res) { showClip('fail', '后台无响应'); return; }
-            if (!res.ok) { showClip('fail', res.error || '未知错误'); return; }
-            showClip('done');
-          });
-        } catch (e) { showClip('fail', String((e && e.message) || e)); }
-      },
+      onclick: function () { clipPageNow(); },
       style: {
         display: 'flex', alignItems: 'center', gap: '5px',
         border: '1px solid ' + ((clipped || clipFailed) ? clipColor : t.border),
