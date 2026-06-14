@@ -26,9 +26,9 @@
   },
   "permissions": ["sidePanel", "storage", "contextMenus", "scripting", "activeTab"],
   "commands": {
-    "open-editor": {
+    "open-panel": {
       "suggested_key": { "default": "Alt+Shift+M", "mac": "Alt+Shift+M" },
-      "description": "打开全屏 Markdown 编辑器"
+      "description": "打开 Zedown 侧边栏速记"
     }
   },
   "content_security_policy": {

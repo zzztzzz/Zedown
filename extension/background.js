@@ -74,10 +74,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // keep the message channel open for the async response
 });
 
-chrome.commands.onCommand.addListener((command) => {
-  if (command === 'open-editor') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('editor/editor.html') });
-  }
+// Keyboard command opens the side panel on the right (a command counts as the
+// required user gesture for chrome.sidePanel.open). Falls back to querying the
+// active window if the listener's tab is unavailable.
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (command !== 'open-panel') return;
+  try {
+    let windowId = tab && tab.windowId;
+    if (windowId == null) {
+      const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      windowId = active && active.windowId;
+    }
+    if (windowId != null) await chrome.sidePanel.open({ windowId });
+  } catch (e) { /* side panel API unavailable / no gesture */ }
 });
 
 // ---- selection capture (upgraded: capture HTML when possible) ----
