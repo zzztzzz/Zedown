@@ -176,9 +176,39 @@
     // keep the <pre class="md-mermaid-src"> fallback in place
   }
 
+  // --- zdiagram rendering (Visual Diagram Studio canvas graphs) ------------
+  // renderZdiagram(proseEl, themeId): turn each .md-zdiagram placeholder into an
+  // exact SVG via window.VS_graphToSVG. Re-renders on theme change (the stored
+  // graph is read back from data-zdiagram, never lost). Idempotent, never
+  // throws, no-op when the renderer or tokens are absent.
+  function renderZdiagram(proseEl, themeId) {
+    try {
+      if (!proseEl || !proseEl.querySelectorAll) return;
+      if (typeof globalThis.VS_graphToSVG !== 'function') return;
+      const tokens = (globalThis.MD_TOKENS || {})[themeId] || (globalThis.MD_TOKENS || {}).paper;
+      if (!tokens) return;
+      const nodes = proseEl.querySelectorAll('.md-zdiagram');
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.dataset.rendered === '1' && node.dataset.zdTheme === themeId) continue;
+        const src = node.getAttribute('data-zdiagram') || '';
+        if (!src.trim()) continue;
+        let svg = '';
+        try { svg = globalThis.VS_graphToSVG(JSON.parse(src), tokens); }
+        catch (e) { svg = ''; }
+        if (!svg) { node.classList.add('md-zdiagram-error'); continue; }
+        node.innerHTML = svg; // VS-generated SVG is trusted markup
+        node.dataset.rendered = '1';
+        node.dataset.zdTheme = themeId || '';
+        node.classList.remove('md-zdiagram-error');
+      }
+    } catch (e) { /* never throw out of renderZdiagram */ }
+  }
+
   globalThis.MDEnhance = {
     codeCopyButtons: codeCopyButtons,
     headingAnchors: headingAnchors,
     renderMermaid: renderMermaid,
+    renderZdiagram: renderZdiagram,
   };
 })();

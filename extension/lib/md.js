@@ -280,6 +280,15 @@
             + '<pre class="md-mermaid-src">' + escSrc + '</pre></div>';
           continue;
         }
+        // zdiagram fenced block → placeholder for the Visual Diagram Studio
+        // renderer (enhance.js → VS_graphToSVG). The <pre> is the visible
+        // fallback (raw graph JSON) until the SVG renders.
+        if (lang.toLowerCase() === 'zdiagram') {
+          const escSrc = esc(raw);
+          html += '<div class="md-zdiagram" data-zdiagram="' + escAttr(raw) + '">'
+            + '<pre class="md-zdiagram-src">' + escSrc + '</pre></div>';
+          continue;
+        }
         let inner;
         if (lang && typeof globalThis.mdHighlight === 'function') {
           try { inner = globalThis.mdHighlight(raw, lang); }

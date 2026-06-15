@@ -570,6 +570,7 @@
       window.MDEnhance.codeCopyButtons(el);
       window.MDEnhance.headingAnchors(el);
       window.MDEnhance.renderMermaid(el, S.themeId);
+      if (window.MDEnhance.renderZdiagram) window.MDEnhance.renderZdiagram(el, S.themeId);
     } catch (e) { /* noop */ }
   }
   function syncPreview(text) {

@@ -288,6 +288,9 @@
         // rebuilds the whole view, so this re-runs with the right themeId on
         // every theme switch. KaTeX math is already final HTML from md.js.
         window.MDEnhance.renderMermaid(prose, themeId);
+        // V2 (Studio): render zdiagram canvas graphs to exact SVG, re-themed
+        // on every setTheme() rebuild just like mermaid above.
+        if (window.MDEnhance.renderZdiagram) window.MDEnhance.renderZdiagram(prose, themeId);
       }
 
       // initial progress / active calc

@@ -136,6 +136,11 @@ ${s} .md-mermaid-src{display:block;background:${t.codeBg};border:1px solid ${t.b
 ${s} .md-mermaid[data-rendered] .md-mermaid-src{display:none;}
 ${s} .md-mermaid-error{border:1px solid color-mix(in oklch, ${t.accent} 45%, ${t.border});border-radius:${t.radius}px;}
 ${s} .md-mermaid-error .md-mermaid-src{border-color:transparent;}
+${s} .md-zdiagram{margin:1em 0;text-align:center;}
+${s} .md-zdiagram svg{max-width:100%;height:auto;border-radius:${t.radius}px;}
+${s} .md-zdiagram-src{display:block;background:${t.codeBg};border:1px solid ${t.border};border-radius:${t.radius}px;padding:14px 16px;overflow:auto;text-align:left;font-family:${t.fontMono};font-size:.82em;color:${t.muted};white-space:pre;}
+${s} .md-zdiagram[data-rendered] .md-zdiagram-src{display:none;}
+${s} .md-zdiagram-error{border:1px solid color-mix(in oklch, ${t.accent} 45%, ${t.border});border-radius:${t.radius}px;}
 `;
   }
 

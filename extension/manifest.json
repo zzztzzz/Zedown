@@ -36,7 +36,7 @@
         "lib/md.js", "lib/highlight.js",
         "lib/vendor/katex/katex.min.js", "lib/vendor/mermaid.min.js",
         "lib/themes.js", "lib/sample.js",
-        "lib/enhance.js", "lib/reader-view.js", "content/mdview.js"
+        "lib/enhance.js", "lib/vs/vs-render.js", "lib/reader-view.js", "content/mdview.js"
       ],
       "css": ["lib/vendor/katex/katex.min.css"],
       "run_at": "document_idle"
