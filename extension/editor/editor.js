@@ -499,6 +499,7 @@
       case 'list': prefixLine(el, '- '); return true;
       case 'task': prefixLine(el, '- [ ] '); return true;
       case 'quote': prefixLine(el, '> '); return true;
+      case 'studio': openStudio(); return true;
       case 'save': S.saved = true; updateLiveBits(); return true;
       case 'toggleSplit': setMode(S.mode === 'edit' ? 'split' : 'edit'); return true;
       case 'reading': setMode('read'); return true;
@@ -523,6 +524,110 @@
       if (_scPanelEl.parentNode) _scPanelEl.parentNode.removeChild(_scPanelEl);
       _scPanelEl = null;
     }
+  }
+
+  // ── V2 Visual Diagram Studio (mounted into editor root) ──────────
+  let _studioEl = null;
+  let _zdBar = null;
+  function liveTextarea() { return (_taEl && document.contains(_taEl)) ? _taEl : null; }
+
+  // Open the studio. With no args it inserts at the caret; with (kind, graph,
+  // range) it re-opens an existing ```zdiagram block and replaces it on insert.
+  function openStudio(initialKind, initialGraph, replaceRange) {
+    if (_studioEl || typeof window.VisualStudio !== 'function') return;
+    const modal = window.VisualStudio({
+      t: T[S.themeId],
+      themeId: S.themeId,
+      initialKind: initialKind || 'flowchart',
+      initialGraph: initialGraph || null,
+      onClose: closeStudio,
+      onInsert: function (snippet) { insertSnippet(snippet, replaceRange); },
+    });
+    _studioEl = modal;
+    root.appendChild(modal);
+  }
+  function closeStudio() {
+    if (!_studioEl) return;
+    if (typeof _studioEl._destroy === 'function') _studioEl._destroy();
+    if (_studioEl.parentNode) _studioEl.parentNode.removeChild(_studioEl);
+    _studioEl = null;
+    const ta = liveTextarea();
+    if (ta) requestAnimationFrame(function () { ta.focus(); });
+  }
+
+  // Insert (or replace) a fenced diagram block at the caret. Canvas kinds come
+  // pre-fenced (```zdiagram); form kinds arrive as bare mermaid → wrap it. Block
+  // is padded with blank lines so it parses as its own paragraph.
+  function insertSnippet(snippet, replaceRange) {
+    const block = snippet.indexOf('```') === 0 ? snippet : ('```mermaid\n' + snippet + '\n```');
+    const ta = liveTextarea();
+    const text = ta ? ta.value : curText();
+    let s, e;
+    if (replaceRange) { s = replaceRange.start; e = replaceRange.end; }
+    else if (ta) { s = ta.selectionStart; e = ta.selectionEnd; }
+    else { s = text.length; e = text.length; }
+    const before = text.slice(0, s);
+    const after = text.slice(e);
+    const padBefore = !before ? '' : (/\n\n$/.test(before) ? '' : (/\n$/.test(before) ? '\n' : '\n\n'));
+    const padAfter = !after ? '\n' : (/^\n\n/.test(after) ? '' : (/^\n/.test(after) ? '\n' : '\n\n'));
+    const ins = padBefore + block + padAfter;
+    const next = before + ins + after;
+    const caret = before.length + padBefore.length + block.length;
+    if (ta) { applyTa(ta, next, caret); requestAnimationFrame(function () { ta.focus(); }); }
+    else { setText(next); render(); }
+    removeZdBar();
+  }
+
+  // Find the ```zdiagram block (if any) whose char range contains `pos`.
+  function findZdiagramBlockAt(text, pos) {
+    const re = /```zdiagram[ \t]*\r?\n([\s\S]*?)\r?\n```/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const start = m.index, end = re.lastIndex;
+      if (pos >= start && pos <= end) {
+        let graph = null;
+        try { graph = JSON.parse(m[1]); } catch (err) { /* keep raw */ }
+        return { start: start, end: end, graph: graph };
+      }
+    }
+    return null;
+  }
+  function removeZdBar() { if (_zdBar) { if (_zdBar.parentNode) _zdBar.parentNode.removeChild(_zdBar); _zdBar = null; } }
+  // Show/refresh the floating "edit this diagram" bar when the caret sits inside
+  // a ```zdiagram block (edit/split only — the bar belongs in the edit lane).
+  function updateZdBar() {
+    if (_studioEl) { removeZdBar(); return; }
+    const ta = liveTextarea();
+    if (!ta || (S.mode !== 'edit' && S.mode !== 'split')) { removeZdBar(); return; }
+    const blk = findZdiagramBlockAt(ta.value, ta.selectionStart);
+    if (!blk) { removeZdBar(); return; }
+    const t = T[S.themeId];
+    removeZdBar();
+    const pill = function (primary) { return { border: primary ? 'none' : '1px solid ' + t.border, background: primary ? t.accent : t.surface, color: primary ? t.accentText : t.muted, cursor: 'pointer', borderRadius: '999px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', fontFamily: t.fontUI }; };
+    const bar = h('div', {
+      style: {
+        position: 'fixed', top: '94px', left: '50%', transform: 'translateX(-50%)', zIndex: '40',
+        display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px 6px 13px',
+        background: t.surface, border: '1px solid ' + t.border, borderRadius: '999px',
+        boxShadow: '0 6px 20px rgba(0,0,0,.16)', fontFamily: t.fontUI, fontSize: '12px', color: t.muted,
+      },
+    },
+      h('span', null, '可视化图表块'),
+      h('button', { onmousedown: function (e) { e.preventDefault(); }, onclick: function () { openStudio((blk.graph && blk.graph.kind) || 'flowchart', blk.graph, { start: blk.start, end: blk.end }); }, style: pill(true) }, '✎ 编辑'),
+      h('button', { onmousedown: function (e) { e.preventDefault(); }, onclick: function () { deleteZdBlock(blk); }, style: pill(false) }, '🗑 删除')
+    );
+    _zdBar = bar;
+    root.appendChild(bar);
+  }
+  function deleteZdBlock(blk) {
+    const ta = liveTextarea(); if (!ta) return;
+    const text = ta.value;
+    let e = blk.end;
+    if (text[e] === '\n') e++; // swallow one trailing newline
+    const next = text.slice(0, blk.start) + text.slice(e);
+    applyTa(ta, next, blk.start);
+    removeZdBar();
+    ta.focus();
   }
 
   // ── live-update bits that change without a full re-render ─────────
@@ -1139,6 +1244,9 @@
       }
     });
     ta.addEventListener('blur', function () { closeSlash(); });
+    // V2: refresh the "edit this diagram" bar as the caret moves.
+    ta.addEventListener('keyup', updateZdBar);
+    ta.addEventListener('click', updateZdBar);
     ta.addEventListener('keydown', function (e) {
       // slash menu navigation takes priority
       if (_slashEl) {
@@ -1263,9 +1371,28 @@
       fmtBtn(t, '≡', '无序列表', 'list'),
       fmtBtn(t, '✓', '待办项', 'task'),
       fmtBtn(t, '“', '引用', 'quote'),
+      sep(),
+      studioBtn(t),
       h('div', { style: { flex: '1' } }),
       allBtn
     );
+  }
+  // ── visual-diagram-studio launcher (sits in the format bar) ──────
+  function studioBtn(t) {
+    const btn = h('button', {
+      onmousedown: function (e) { e.preventDefault(); },
+      onclick: function () { openStudio(); },
+      title: '可视化图表 · 拖拽 / 填表画图,无需手写代码',
+      style: {
+        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+        border: '1px solid ' + t.border, borderRadius: px(t.radius - 3), background: 'transparent',
+        color: t.muted, fontSize: '12px', fontWeight: '600', fontFamily: t.fontUI, padding: '0 10px', height: '30px',
+        transition: 'all .12s',
+      },
+    }, h('span', { style: { fontSize: '14px' } }, '⧉'), '画图');
+    btn.addEventListener('mouseenter', function () { btn.style.background = t.surface2; btn.style.color = t.text; btn.style.borderColor = t.borderStrong; });
+    btn.addEventListener('mouseleave', function () { btn.style.background = 'transparent'; btn.style.color = t.muted; btn.style.borderColor = t.border; });
+    return btn;
   }
 
   // ── V3 empty state (no files) ────────────────────────────────────
