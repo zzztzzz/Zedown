@@ -101,4 +101,7 @@ extension/
 
 ## 设计来源
 
-`design/` 保存了设计来源：1.1.0 的三个设计探索稿（打包 HTML，`设计探索 1.1.0-a/b/c`），以及 `design/design-src/`（解包出的原始 React 原型 `MDApp.jsx`、各 `comp_*.jsx`、`helper_*.js`）。生产扩展为其无框架、可直接加载的等价实现。
+`design/` 保存了设计来源，按设计迭代分目录：
+
+- **`design/v1/`** —— 初始设计探索：三个打包 HTML 设计稿（`设计探索 1.1.0-a/b/c`）与原始 React 原型（`MDApp.jsx`、`comp_*.jsx`、`helper_*.js`）。当前生产扩展（1.1.x）即其无框架、可直接加载的等价实现。
+- **`design/v2/handoff_visual_diagrams/`** —— 「可视化图表工作台（Visual Diagram Studio）」交接稿：拖拽 / 填表绘制流程图、状态图、思维导图、类图、时序图、饼图、甘特图的设计参考原型（React + 内联 JSX），待按本仓库技术栈重建，**尚未集成进扩展**。详见该目录下的 `README.md`。
