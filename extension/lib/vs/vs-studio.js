@@ -30,7 +30,7 @@
     var switched = false;
     var code = '', svgStr = '', graph = null;
     var curEditor = null;     // { el, destroy }
-    var seqTimer = null;
+    var seqTimer = null, seqSeq = 0;
 
     function curKind() { return KINDS.find(function (k) { return k.id === kind; }); }
 
@@ -84,12 +84,28 @@
       }
     }
 
+    // Debounced live preview: render the emitted mermaid to SVG via the bundled
+    // mermaid (initialized to match the active theme), and on failure show the
+    // error text in red — matching the prototype's SeqPreview behavior.
     function renderSeqPreview(host, codeStr) {
       if (seqTimer) clearTimeout(seqTimer);
       seqTimer = setTimeout(function () {
         if (!codeStr) { host.textContent = ''; return; }
-        host.innerHTML = '<div class="md-mermaid" data-mermaid="' + escAttr(codeStr) + '"></div>';
-        if (window.MDEnhance && window.MDEnhance.renderMermaid) window.MDEnhance.renderMermaid(host, themeId);
+        var m = window.mermaid;
+        if (!m || typeof m.render !== 'function') { host.textContent = ''; return; }
+        var showErr = function (err) {
+          host.textContent = '';
+          host.appendChild(el('div', { style: { fontSize: '11.5px', color: 'oklch(0.55 0.18 25)', fontFamily: t.fontMono } }, (err && err.message) ? err.message : String(err)));
+        };
+        var id = 'vs-seq-' + (++seqSeq);
+        var cleanup = function () { var o = document.getElementById('d' + id) || document.getElementById(id); if (o && o.parentElement === document.body) o.remove(); };
+        try { m.initialize({ startOnLoad: false, securityLevel: 'strict', theme: themeId === 'midnight' ? 'dark' : 'default' }); } catch (e) { /* noop */ }
+        try {
+          var out = m.render(id, codeStr);
+          if (out && typeof out.then === 'function') {
+            out.then(function (r) { host.innerHTML = (r && r.svg) ? r.svg : (typeof r === 'string' ? r : ''); cleanup(); }, function (err) { cleanup(); showErr(err); });
+          } else if (typeof out === 'string') { host.innerHTML = out; }
+        } catch (err) { cleanup(); showErr(err); }
       }, 200);
     }
 

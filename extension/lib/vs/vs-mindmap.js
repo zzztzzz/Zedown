@@ -36,6 +36,7 @@
     var topics = init.topics, rootId = init.rootId;
     var sel = rootId, editing = null;
     var laid = null, posById = {};
+    var pill = null, editInput = null;
 
     var scrollEl = el('div', { style: { flex: '1', overflow: 'auto', position: 'relative', background: t.surface2, backgroundImage: 'radial-gradient(' + t.border + ' 1px, transparent 1px)', backgroundSize: '22px 22px' } });
     var bar = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px', borderBottom: '1px solid ' + t.border, background: t.surface2 } },
@@ -46,7 +47,7 @@
     var delBtn = el('button', { onclick: function () { removeTopic(sel); }, style: Object.assign({}, btnStyle(t, false), { opacity: sel === rootId ? '.4' : '1' }) }, '删除');
     bar.appendChild(delBtn);
 
-    var root = el('div', { tabindex: '0', style: { display: 'flex', flexDirection: 'column', height: '100%', outline: 'none' } }, bar, scrollEl);
+    var root = el('div', { tabindex: '0', style: { position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', outline: 'none' } }, bar, scrollEl);
     root.addEventListener('keydown', onKey);
 
     function topicById(id) { return topics.find(function (x) { return x.id === id; }); }
@@ -91,6 +92,7 @@
       posById = {}; laid.nodes.forEach(function (n) { posById[n.id] = n; });
       delBtn.style.opacity = sel === rootId ? '.4' : '1';
       delBtn.disabled = sel === rootId;
+      editInput = null;
 
       scrollEl.textContent = '';
       var inner = el('div', { style: { position: 'relative', width: laid.w + 'px', height: laid.h + 'px', minWidth: '100%', minHeight: '100%' } });
@@ -101,11 +103,17 @@
       laid.nodes.forEach(function (n) {
         var on = n.id === sel, isRoot = n.isRoot;
         var node = el('div', { style: { position: 'absolute', left: n.x + 'px', top: n.y + 'px', width: n.w + 'px', height: n.h + 'px', display: 'grid', placeItems: 'center', boxSizing: 'border-box', padding: '0 10px', cursor: 'pointer', userSelect: 'none', background: isRoot ? t.accent : t.surface, color: isRoot ? t.accentText : t.text, border: '2px solid ' + (on ? t.accent : (isRoot ? t.accent : (n.bcolor || t.borderStrong))), borderRadius: (n.h / 2) + 'px', fontSize: (isRoot ? 14 : 12.5) + 'px', fontWeight: isRoot ? '700' : '600', boxShadow: on ? '0 0 0 3px ' + t.accentSoft : t.shadow } });
-        node.addEventListener('pointerdown', function (e) { e.stopPropagation(); sel = n.id; if (editing !== n.id) { editing = null; paint(); root.focus(); } });
+        node.addEventListener('pointerdown', function (e) {
+          e.stopPropagation();
+          if (editing === n.id) return;            // clicking the node being edited: leave it
+          if (editing && editInput) commit(editInput.value); // commit any other in-progress rename first
+          sel = n.id; editing = null; paint(); root.focus();
+        });
         node.addEventListener('dblclick', function (e) { e.stopPropagation(); editing = n.id; paint(); });
         if (editing === n.id) {
           var tp = topicById(n.id);
           var inp = el('input', { value: tp ? tp.label : '', style: { width: '94%', border: 'none', outline: 'none', background: 'transparent', textAlign: 'center', color: isRoot ? t.accentText : t.text, fontSize: (isRoot ? 14 : 12.5) + 'px', fontWeight: isRoot ? '700' : '600', fontFamily: t.fontUI } });
+          editInput = inp;
           inp.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
           inp.addEventListener('blur', function () { commit(inp.value); });
           inp.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); commit(inp.value); } if (e.key === 'Escape') { editing = null; paint(); } });
@@ -115,6 +123,15 @@
         inner.appendChild(node);
       });
       scrollEl.appendChild(inner);
+
+      // bottom floating quick-action pill (shown whenever a node is selected)
+      if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
+      if (sel) {
+        pill = el('div', { style: { position: 'absolute', bottom: '14px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', padding: '6px', background: t.surface, border: '1px solid ' + t.border, borderRadius: '999px', boxShadow: '0 6px 20px rgba(0,0,0,.14)' } },
+          el('button', { onclick: function () { addChild(sel); }, style: btnStyle(t, true) }, 'Tab · 子主题'),
+          el('button', { onclick: function () { addSibling(sel); }, style: btnStyle(t, false) }, 'Enter · 同级'));
+        root.appendChild(pill);
+      }
       emit();
     }
 

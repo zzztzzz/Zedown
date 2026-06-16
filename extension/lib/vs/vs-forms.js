@@ -33,14 +33,16 @@
       msgs.forEach(function (m) { out += '  ' + m.from.replace(/\s/g, '_') + (m.dashed ? '-->>' : '->>') + m.to.replace(/\s/g, '_') + ': ' + m.text + '\n'; });
       if (opts.onMermaid) opts.onMermaid(out.trim());
     }
-    function renamePart(i, v) { var old = parts[i]; parts[i] = v; msgs.forEach(function (m) { if (m.from === old) m.from = v; if (m.to === old) m.to = v; }); buildParts(); buildMsgs(); emit(); }
+    // Live rename: update model + remap messages + refresh message-row selects,
+    // WITHOUT rebuilding the participant chips (would steal focus mid-typing).
+    function renamePart(i, v) { var old = parts[i]; parts[i] = v; msgs.forEach(function (m) { if (m.from === old) m.from = v; if (m.to === old) m.to = v; }); buildMsgs(); emit(); }
 
     function buildParts() {
       partsHost.textContent = '';
       parts.forEach(function (p, i) {
         var chip = el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', background: t.surface2, border: '1px solid ' + t.border, borderRadius: t.radius + 'px', padding: '4px 4px 4px 10px' } });
         var f = el('input', { value: p, style: Object.assign({}, inp(t), { border: 'none', background: 'transparent', width: '70px', padding: '2px 0' }) });
-        f.addEventListener('change', function () { renamePart(i, f.value); });
+        f.addEventListener('input', function () { renamePart(i, f.value); });
         var rm = el('button', { onclick: function () { var nm = parts[i]; parts = parts.filter(function (_, k) { return k !== i; }); msgs = msgs.filter(function (m) { return m.from !== nm && m.to !== nm; }); buildParts(); buildMsgs(); emit(); }, style: Object.assign({}, iconBtn(t), { width: '22px', height: '22px' }) }, '✕');
         chip.appendChild(f); chip.appendChild(rm); partsHost.appendChild(chip);
       });
@@ -199,7 +201,7 @@
     function buildForm() {
       formHost.textContent = '';
       var titleInp = el('input', { value: title, style: Object.assign({}, inp(t), { width: '100%', marginBottom: '16px' }) });
-      titleInp.addEventListener('input', function () { title = titleInp.value; emit(); });
+      titleInp.addEventListener('input', function () { title = titleInp.value; paintPreview(); emit(); });
       formHost.appendChild(el('div', { style: sectionLabel(t) }, '标题'));
       formHost.appendChild(titleInp);
       sections.forEach(function (s, si) {
