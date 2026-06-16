@@ -629,6 +629,73 @@
     removeZdBar();
     ta.focus();
   }
+  // All ```zdiagram blocks in document order, with char ranges + parsed graph.
+  function allZdiagramBlocks(text) {
+    const re = /```zdiagram[ \t]*\r?\n([\s\S]*?)\r?\n```/g;
+    const out = []; let m;
+    while ((m = re.exec(text))) {
+      let g = null; try { g = JSON.parse(m[1]); } catch (err) { /* keep raw */ }
+      out.push({ start: m.index, end: re.lastIndex, graph: g });
+    }
+    return out;
+  }
+  // Map a rendered .md-zdiagram figure (in the live preview) back to its source
+  // block by document order, then act on it. The Nth rendered figure ↔ Nth
+  // ```zdiagram block — md.js emits both in document order.
+  function zdBlockForFig(fig) {
+    const ta = liveTextarea();
+    if (!ta || !_previewEl) return null;
+    const figs = Array.prototype.slice.call(_previewEl.querySelectorAll('.md-zdiagram'));
+    const idx = figs.indexOf(fig);
+    if (idx < 0) return null;
+    const blocks = allZdiagramBlocks(ta.value);
+    return blocks[idx] || null;
+  }
+  // Hover affordance: each rendered canvas diagram in the editor preview gets a
+  // ✎编辑 / 🗑删除 overlay on hover (double-click the figure also edits). Edit
+  // re-opens the studio with the stored graph and replaces the source block.
+  function attachZdHover(container) {
+    if (!container || !container.querySelectorAll) return;
+    const t = T[S.themeId];
+    const figs = container.querySelectorAll('.md-zdiagram');
+    const miniBtn = function (primary) {
+      return { border: primary ? 'none' : '1px solid ' + t.border, background: primary ? t.accent : t.surface, color: primary ? t.accentText : t.muted, cursor: 'pointer', borderRadius: '7px', padding: '5px 10px', fontSize: '12px', fontWeight: '600', fontFamily: t.fontUI };
+    };
+    for (let i = 0; i < figs.length; i++) {
+      const fig = figs[i];
+      if (fig.dataset.zdHover === '1') continue;
+      fig.dataset.zdHover = '1';
+      fig.style.position = 'relative';
+      fig.style.display = 'inline-block';
+      const bar = h('div', {
+        style: {
+          position: 'absolute', top: '8px', right: '8px', zIndex: '5', display: 'none',
+          alignItems: 'center', gap: '6px', padding: '4px', background: t.surface,
+          border: '1px solid ' + t.border, borderRadius: '9px', boxShadow: '0 6px 18px rgba(0,0,0,.16)',
+        },
+      },
+        h('button', { onclick: function (ev) { ev.stopPropagation(); editZdFig(fig); }, title: '编辑此图', style: miniBtn(true) }, '✎ 编辑'),
+        h('button', { onclick: function (ev) { ev.stopPropagation(); deleteZdFig(fig); }, title: '删除此图', style: miniBtn(false) }, '🗑 删除')
+      );
+      fig.appendChild(bar);
+      fig.addEventListener('mouseenter', function () { bar.style.display = 'flex'; });
+      fig.addEventListener('mouseleave', function () { bar.style.display = 'none'; });
+      fig.addEventListener('dblclick', function (ev) { ev.preventDefault(); editZdFig(fig); });
+      fig.style.cursor = 'default';
+    }
+  }
+  function editZdFig(fig) {
+    const blk = zdBlockForFig(fig);
+    if (!blk) return;
+    openStudio((blk.graph && blk.graph.kind) || 'flowchart', blk.graph, { start: blk.start, end: blk.end });
+  }
+  function deleteZdFig(fig) {
+    const ta = liveTextarea(); if (!ta) return;
+    const blk = zdBlockForFig(fig); if (!blk) return;
+    let e = blk.end;
+    if (ta.value[e] === '\n') e++;
+    applyTa(ta, ta.value.slice(0, blk.start) + ta.value.slice(e), blk.start);
+  }
 
   // ── live-update bits that change without a full re-render ─────────
   // (footer status + autosave dot + preview), keeping textarea focused.
@@ -676,6 +743,8 @@
       window.MDEnhance.headingAnchors(el);
       window.MDEnhance.renderMermaid(el, S.themeId);
       if (window.MDEnhance.renderZdiagram) window.MDEnhance.renderZdiagram(el, S.themeId);
+      // Hover edit/delete overlay on rendered canvas diagrams (editor preview only).
+      if (el === _previewEl && (S.mode === 'edit' || S.mode === 'split')) attachZdHover(el);
     } catch (e) { /* noop */ }
   }
   function syncPreview(text) {
