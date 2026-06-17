@@ -533,13 +533,14 @@
 
   // Open the studio. With no args it inserts at the caret; with (kind, graph,
   // range) it re-opens an existing ```zdiagram block and replaces it on insert.
-  function openStudio(initialKind, initialGraph, replaceRange) {
+  function openStudio(initialKind, initialGraph, replaceRange, initialForm) {
     if (_studioEl || typeof window.VisualStudio !== 'function') return;
     const modal = window.VisualStudio({
       t: T[S.themeId],
       themeId: S.themeId,
       initialKind: initialKind || 'flowchart',
       initialGraph: initialGraph || null,
+      initialForm: initialForm || null,
       onClose: closeStudio,
       onInsert: function (snippet) { insertSnippet(snippet, replaceRange); },
     });
@@ -651,22 +652,46 @@
     const blocks = allZdiagramBlocks(ta.value);
     return blocks[idx] || null;
   }
-  // Hover affordance: each rendered canvas diagram in the editor preview gets a
-  // ✎编辑 / 🗑删除 overlay on hover (double-click the figure also edits). Edit
-  // re-opens the studio with the stored graph and replaces the source block.
-  function attachZdHover(container) {
+  // All ```mermaid blocks in document order, with char ranges + raw code.
+  function allMermaidBlocks(text) {
+    const re = /```mermaid[ \t]*\r?\n([\s\S]*?)\r?\n```/g;
+    const out = []; let m;
+    while ((m = re.exec(text))) out.push({ start: m.index, end: re.lastIndex, code: m[1] });
+    return out;
+  }
+  function mermaidBlockForFig(fig) {
+    const ta = liveTextarea();
+    if (!ta || !_previewEl) return null;
+    const figs = Array.prototype.slice.call(_previewEl.querySelectorAll('.md-mermaid'));
+    const idx = figs.indexOf(fig);
+    if (idx < 0) return null;
+    const blocks = allMermaidBlocks(ta.value);
+    return blocks[idx] || null;
+  }
+  // Hover affordance on every rendered diagram in the editor preview: a
+  // ✎编辑 / 🗑删除 overlay appears on hover (double-click the figure also edits).
+  // Canvas (```zdiagram) re-opens the studio with the stored graph; form
+  // (```mermaid) re-opens it by parsing the mermaid back into form state, and
+  // falls back to selecting the source block when it can't be parsed.
+  function attachDiagramHover(container) {
     if (!container || !container.querySelectorAll) return;
+    attachHoverFor(container.querySelectorAll('.md-zdiagram'), editZdFig, deleteZdFig, true);
+    attachHoverFor(container.querySelectorAll('.md-mermaid'), editMermaidFig, deleteMermaidFig, true);
+  }
+  function attachHoverFor(figs, onEdit, onDelete, hugContent) {
     const t = T[S.themeId];
-    const figs = container.querySelectorAll('.md-zdiagram');
     const miniBtn = function (primary) {
       return { border: primary ? 'none' : '1px solid ' + t.border, background: primary ? t.accent : t.surface, color: primary ? t.accentText : t.muted, cursor: 'pointer', borderRadius: '7px', padding: '5px 10px', fontSize: '12px', fontWeight: '600', fontFamily: t.fontUI };
     };
     for (let i = 0; i < figs.length; i++) {
       const fig = figs[i];
-      if (fig.dataset.zdHover === '1') continue;
-      fig.dataset.zdHover = '1';
-      fig.style.position = 'relative';
-      fig.style.display = 'inline-block';
+      if (fig.dataset.diagHover === '1') continue;
+      fig.dataset.diagHover = '1';
+      // Wrap the figure so the overlay is a SIBLING of the diagram, not a child:
+      // mermaid renders async and overwrites the block's innerHTML, which would
+      // wipe an overlay placed inside it.
+      const wrap = h('div', { style: { position: 'relative', display: hugContent ? 'inline-block' : 'block', maxWidth: '100%' } });
+      if (fig.parentNode) { fig.parentNode.insertBefore(wrap, fig); wrap.appendChild(fig); }
       const bar = h('div', {
         style: {
           position: 'absolute', top: '8px', right: '8px', zIndex: '5', display: 'none',
@@ -674,14 +699,13 @@
           border: '1px solid ' + t.border, borderRadius: '9px', boxShadow: '0 6px 18px rgba(0,0,0,.16)',
         },
       },
-        h('button', { onclick: function (ev) { ev.stopPropagation(); editZdFig(fig); }, title: '编辑此图', style: miniBtn(true) }, '✎ 编辑'),
-        h('button', { onclick: function (ev) { ev.stopPropagation(); deleteZdFig(fig); }, title: '删除此图', style: miniBtn(false) }, '🗑 删除')
+        h('button', { onclick: function (ev) { ev.stopPropagation(); onEdit(fig); }, title: '编辑此图', style: miniBtn(true) }, '✎ 编辑'),
+        h('button', { onclick: function (ev) { ev.stopPropagation(); onDelete(fig); }, title: '删除此图', style: miniBtn(false) }, '🗑 删除')
       );
-      fig.appendChild(bar);
-      fig.addEventListener('mouseenter', function () { bar.style.display = 'flex'; });
-      fig.addEventListener('mouseleave', function () { bar.style.display = 'none'; });
-      fig.addEventListener('dblclick', function (ev) { ev.preventDefault(); editZdFig(fig); });
-      fig.style.cursor = 'default';
+      wrap.appendChild(bar);
+      wrap.addEventListener('mouseenter', function () { bar.style.display = 'flex'; });
+      wrap.addEventListener('mouseleave', function () { bar.style.display = 'none'; });
+      fig.addEventListener('dblclick', function (ev) { ev.preventDefault(); onEdit(fig); });
     }
   }
   function editZdFig(fig) {
@@ -692,6 +716,20 @@
   function deleteZdFig(fig) {
     const ta = liveTextarea(); if (!ta) return;
     const blk = zdBlockForFig(fig); if (!blk) return;
+    let e = blk.end;
+    if (ta.value[e] === '\n') e++;
+    applyTa(ta, ta.value.slice(0, blk.start) + ta.value.slice(e), blk.start);
+  }
+  function editMermaidFig(fig) {
+    const ta = liveTextarea(); if (!ta) return;
+    const blk = mermaidBlockForFig(fig); if (!blk) return;
+    const form = (typeof window.VS_parseMermaid === 'function') ? window.VS_parseMermaid(blk.code) : null;
+    if (form && form.kind) openStudio(form.kind, null, { start: blk.start, end: blk.end }, form);
+    else { ta.focus(); ta.selectionStart = blk.start; ta.selectionEnd = blk.end; } // hand-written: jump to source
+  }
+  function deleteMermaidFig(fig) {
+    const ta = liveTextarea(); if (!ta) return;
+    const blk = mermaidBlockForFig(fig); if (!blk) return;
     let e = blk.end;
     if (ta.value[e] === '\n') e++;
     applyTa(ta, ta.value.slice(0, blk.start) + ta.value.slice(e), blk.start);
@@ -743,8 +781,8 @@
       window.MDEnhance.headingAnchors(el);
       window.MDEnhance.renderMermaid(el, S.themeId);
       if (window.MDEnhance.renderZdiagram) window.MDEnhance.renderZdiagram(el, S.themeId);
-      // Hover edit/delete overlay on rendered canvas diagrams (editor preview only).
-      if (el === _previewEl && (S.mode === 'edit' || S.mode === 'split')) attachZdHover(el);
+      // Hover edit/delete overlay on every rendered diagram (editor preview only).
+      if (el === _previewEl && (S.mode === 'edit' || S.mode === 'split')) attachDiagramHover(el);
     } catch (e) { /* noop */ }
   }
   function syncPreview(text) {

@@ -59,6 +59,7 @@
       code = ''; svgStr = ''; graph = null;
       var cur = curKind();
       var ig = (!switched && props.initialGraph) ? props.initialGraph : null;
+      var fi = (!switched && props.initialForm && props.initialForm.kind === kind) ? props.initialForm : null;
 
       if (kind === 'mindmap') {
         curEditor = window.VS_Mindmap({ t: t, initialGraph: ig, onGraph: onGraph, onMermaid: onMermaid, onSVG: onSVG });
@@ -72,14 +73,14 @@
         var prevHost = el('div', { style: { width: '100%' } });
         prevPane.appendChild(prevHost);
         var seqOnMermaid = function (s) { code = s; renderSeqPreview(prevHost, s); };
-        curEditor = window.VS_Sequence({ t: t, onMermaid: seqOnMermaid });
+        curEditor = window.VS_Sequence({ t: t, initial: fi, onMermaid: seqOnMermaid });
         editorArea.appendChild(el('div', { style: { display: 'flex', height: '100%' } },
           el('div', { style: { flex: '1', minWidth: '0' } }, curEditor.el), prevPane));
       } else if (kind === 'pie') {
-        curEditor = window.VS_Pie({ t: t, onMermaid: onMermaid });
+        curEditor = window.VS_Pie({ t: t, initial: fi, onMermaid: onMermaid });
         editorArea.appendChild(curEditor.el);
       } else if (kind === 'gantt') {
-        curEditor = window.VS_Gantt({ t: t, onMermaid: onMermaid });
+        curEditor = window.VS_Gantt({ t: t, initial: fi, onMermaid: onMermaid });
         editorArea.appendChild(curEditor.el);
       }
     }

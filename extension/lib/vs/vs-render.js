@@ -178,8 +178,62 @@
     return '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" font-family="' + ff + '"><rect width="' + W + '" height="' + H + '" fill="' + t.surface + '"/>' + body + '</svg>';
   }
 
+  // Parse a mermaid string emitted by the form editors back into form state, so
+  // a ```mermaid block can be re-opened in the studio and edited visually. Only
+  // handles the studio's own deterministic output (sequence / pie / gantt);
+  // returns null for anything it doesn't recognize (caller falls back).
+  function parseMermaid(code) {
+    if (!code) return null;
+    var lines = code.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    if (!lines.length) return null;
+    var head = lines[0].toLowerCase();
+
+    if (head.indexOf('sequencediagram') === 0) {
+      var parts = [], msgs = [];
+      lines.slice(1).forEach(function (l) {
+        var mp = /^participant\s+(.+)$/i.exec(l);
+        if (mp) { parts.push(mp[1].trim().replace(/_/g, ' ')); return; }
+        var mm = /^(.+?)(--?>>)(.+?):\s*(.*)$/.exec(l);
+        if (mm) msgs.push({ from: mm[1].trim().replace(/_/g, ' '), to: mm[3].trim().replace(/_/g, ' '), text: mm[4].trim(), dashed: mm[2] === '-->>' });
+      });
+      msgs.forEach(function (m) { if (parts.indexOf(m.from) < 0) parts.push(m.from); if (parts.indexOf(m.to) < 0) parts.push(m.to); });
+      if (!parts.length) return null;
+      return { kind: 'sequence', parts: parts, msgs: msgs };
+    }
+
+    if (head.indexOf('pie') === 0) {
+      var title = '', rows = [];
+      var tm = /^pie\s+title\s+(.+)$/i.exec(lines[0]); if (tm) title = tm[1].trim();
+      lines.slice(1).forEach(function (l) { var rm = /^"(.*)"\s*:\s*([\d.]+)$/.exec(l); if (rm) rows.push({ label: rm[1], value: Number(rm[2]) || 0 }); });
+      if (!rows.length) return null;
+      return { kind: 'pie', title: title, rows: rows };
+    }
+
+    if (head.indexOf('gantt') === 0) {
+      var gtitle = '', sections = [], cur = null;
+      lines.slice(1).forEach(function (l) {
+        var tm2 = /^title\s+(.+)$/i.exec(l); if (tm2) { gtitle = tm2[1].trim(); return; }
+        if (/^dateformat/i.test(l)) return;
+        var sm = /^section\s+(.+)$/i.exec(l); if (sm) { cur = { name: sm[1].trim(), tasks: [] }; sections.push(cur); return; }
+        var tk = /^(.+?)\s*:\s*(.+)$/.exec(l);
+        if (tk && cur) {
+          var name = tk[1].trim();
+          var rest = tk[2].split(',').map(function (s) { return s.trim(); });
+          var status = '', start = '', days = 1;
+          if (rest[0] === 'done' || rest[0] === 'active') status = rest[0];
+          rest.forEach(function (tok) { if (/^\d{4}-\d{2}-\d{2}$/.test(tok)) start = tok; var dm = /^(\d+)d$/.exec(tok); if (dm) days = Number(dm[1]); });
+          cur.tasks.push({ name: name, start: start, days: days, status: status });
+        }
+      });
+      if (!sections.length) return null;
+      return { kind: 'gantt', title: gtitle, sections: sections };
+    }
+    return null;
+  }
+
   window.VS_graphToSVG = graphToSVG;
   window.VS_mindmapToSVG = mindmapToSVG;
+  window.VS_parseMermaid = parseMermaid;
   window.VS_mindmapLayout = mindmapLayout;
   window.VS_mindmapPath = mmPath;
   window.VS_SHAPES = SHAPES;

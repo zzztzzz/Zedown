@@ -16,8 +16,9 @@
   // ───────────────────────── Sequence ─────────────────────────
   function VS_Sequence(opts) {
     var t = opts.t;
-    var parts = ['用户', '插件', '存储'];
-    var msgs = [
+    var ini = opts.initial && opts.initial.parts ? opts.initial : null;
+    var parts = ini ? ini.parts.slice() : ['用户', '插件', '存储'];
+    var msgs = ini ? (ini.msgs || []).map(function (m) { return { from: m.from, to: m.to, text: m.text, dashed: !!m.dashed }; }) : [
       { from: '用户', to: '插件', text: '编辑笔记', dashed: false },
       { from: '插件', to: '存储', text: '保存', dashed: false },
       { from: '存储', to: '插件', text: '完成', dashed: true },
@@ -86,8 +87,9 @@
   var PIE_COLORS = ['#e2792f', '#2f8a6b', '#4f6bd6', '#c2497a', '#9a6bd6', '#c9a227', '#5aaecb', '#8a8a8a'];
   function VS_Pie(opts) {
     var t = opts.t;
-    var title = '笔记分类占比';
-    var rows = [{ label: '工作', value: 45 }, { label: '个人', value: 30 }, { label: '读书', value: 15 }, { label: '其它', value: 10 }];
+    var iniP = opts.initial && opts.initial.rows ? opts.initial : null;
+    var title = iniP ? (iniP.title || '占比') : '笔记分类占比';
+    var rows = iniP ? iniP.rows.map(function (r) { return { label: r.label, value: r.value }; }) : [{ label: '工作', value: 45 }, { label: '个人', value: 30 }, { label: '读书', value: 15 }, { label: '其它', value: 10 }];
     var rowsHost = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '7px' } });
     var preview = el('div', { style: { width: '240px', flexShrink: '0', borderLeft: '1px solid ' + t.border, background: t.surface2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', padding: '20px' } });
 
@@ -152,8 +154,9 @@
   var GANTT_STATUS = [{ id: 'done', label: '已完成' }, { id: 'active', label: '进行中' }, { id: '', label: '未开始' }];
   function VS_Gantt(opts) {
     var t = opts.t;
-    var title = '项目排期';
-    var sections = [
+    var iniG = opts.initial && opts.initial.sections ? opts.initial : null;
+    var title = iniG ? (iniG.title || '排期') : '项目排期';
+    var sections = iniG ? iniG.sections.map(function (s) { return { name: s.name, tasks: (s.tasks || []).map(function (tk) { return { name: tk.name, start: tk.start, days: tk.days, status: tk.status }; }) }; }) : [
       { name: '设计', tasks: [{ name: '原型', start: '2026-06-01', days: 5, status: 'done' }, { name: '评审', start: '2026-06-06', days: 3, status: 'active' }] },
       { name: '开发', tasks: [{ name: '编码', start: '2026-06-09', days: 7, status: '' }] },
     ];
