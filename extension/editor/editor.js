@@ -594,14 +594,46 @@
     return null;
   }
   function removeZdBar() { if (_zdBar) { if (_zdBar.parentNode) _zdBar.parentNode.removeChild(_zdBar); _zdBar = null; } }
+  const KIND_LABEL = { flowchart: '流程图', state: '状态图', mindmap: '思维导图', class: '类图', sequence: '时序图', pie: '饼图', gantt: '甘特图' };
+  function detectMermaidKind(code) {
+    const head = (String(code || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean)[0] || '').toLowerCase();
+    if (head.indexOf('sequencediagram') === 0) return 'sequence';
+    if (head.indexOf('pie') === 0) return 'pie';
+    if (head.indexOf('gantt') === 0) return 'gantt';
+    if (head.indexOf('statediagram') === 0) return 'state';
+    if (head.indexOf('classdiagram') === 0) return 'class';
+    if (head.indexOf('mindmap') === 0) return 'mindmap';
+    if (head.indexOf('flowchart') === 0 || head.indexOf('graph ') === 0) return 'flowchart';
+    return '';
+  }
+  // The diagram block (```zdiagram or ```mermaid) whose char range holds the caret.
+  function diagramBlockAt(text, pos) {
+    const zd = findZdiagramBlockAt(text, pos);
+    if (zd) return { type: 'zdiagram', start: zd.start, end: zd.end, graph: zd.graph };
+    const re = /```mermaid[ \t]*\r?\n([\s\S]*?)\r?\n```/g; let m;
+    while ((m = re.exec(text))) { if (pos >= m.index && pos <= re.lastIndex) return { type: 'mermaid', start: m.index, end: re.lastIndex, code: m[1] }; }
+    return null;
+  }
   // Show/refresh the floating "edit this diagram" bar when the caret sits inside
-  // a ```zdiagram block (edit/split only — the bar belongs in the edit lane).
+  // ANY diagram block — ```zdiagram OR ```mermaid (sequence / pie / gantt). Edit/
+  // split only. ✎编辑 re-opens the studio (canvas → graph; form → parsed mermaid);
+  // unparseable hand-written mermaid shows just the label + 🗑删除.
   function updateZdBar() {
     if (_studioEl) { removeZdBar(); return; }
     const ta = liveTextarea();
     if (!ta || (S.mode !== 'edit' && S.mode !== 'split')) { removeZdBar(); return; }
-    const blk = findZdiagramBlockAt(ta.value, ta.selectionStart);
+    const blk = diagramBlockAt(ta.value, ta.selectionStart);
     if (!blk) { removeZdBar(); return; }
+    let kindLabel = '图表', onEdit = null;
+    if (blk.type === 'zdiagram') {
+      const k = blk.graph && blk.graph.kind;
+      kindLabel = KIND_LABEL[k] || '图表';
+      if (blk.graph) onEdit = function () { openStudio(k || 'flowchart', blk.graph, { start: blk.start, end: blk.end }); };
+    } else {
+      const form = (typeof window.VS_parseMermaid === 'function') ? window.VS_parseMermaid(blk.code) : null;
+      if (form && form.kind) { kindLabel = KIND_LABEL[form.kind] || '图表'; onEdit = function () { openStudio(form.kind, null, { start: blk.start, end: blk.end }, form); }; }
+      else { kindLabel = KIND_LABEL[detectMermaidKind(blk.code)] || '图表'; }
+    }
     const t = T[S.themeId];
     removeZdBar();
     const pill = function (primary) { return { border: primary ? 'none' : '1px solid ' + t.border, background: primary ? t.accent : t.surface, color: primary ? t.accentText : t.muted, cursor: 'pointer', borderRadius: '999px', padding: '5px 12px', fontSize: '12px', fontWeight: '600', fontFamily: t.fontUI }; };
@@ -613,8 +645,8 @@
         boxShadow: '0 6px 20px rgba(0,0,0,.16)', fontFamily: t.fontUI, fontSize: '12px', color: t.muted,
       },
     },
-      h('span', null, '可视化图表块'),
-      h('button', { onmousedown: function (e) { e.preventDefault(); }, onclick: function () { openStudio((blk.graph && blk.graph.kind) || 'flowchart', blk.graph, { start: blk.start, end: blk.end }); }, style: pill(true) }, '✎ 编辑'),
+      h('span', null, '当前' + kindLabel),
+      onEdit ? h('button', { onmousedown: function (e) { e.preventDefault(); }, onclick: onEdit, style: pill(true) }, '✎ 编辑') : false,
       h('button', { onmousedown: function (e) { e.preventDefault(); }, onclick: function () { deleteZdBlock(blk); }, style: pill(false) }, '🗑 删除')
     );
     _zdBar = bar;
