@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Zedown — Markdown 速记 · 编辑 · 阅读",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Zedown：侧边栏速记、全屏分屏编辑、纯净只读阅读，支持公式 / 图表 / 可视化画图 / 语法高亮 / 快捷键 —— 一个干净、专注的 Markdown 笔记插件。",
   "icons": {
     "16": "icons/icon16.png",

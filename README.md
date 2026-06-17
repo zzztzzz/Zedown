@@ -1,6 +1,6 @@
 # Zedown — Markdown 速记 · 编辑 · 阅读 — Chrome 扩展
 
-> **当前版本：`1.2.1`**（见 `extension/manifest.json`，Manifest V3）。版本号以 GitHub Releases 为准。
+> **当前版本：`1.2.2`**（见 `extension/manifest.json`，Manifest V3）。版本号以 GitHub Releases 为准。
 
 一个干净、专注的 Markdown 笔记浏览器扩展，由设计稿 `Markdown 插件 设计探索 1.1.0-a (打包).html` 还原实现。提供三个界面：
 
@@ -13,6 +13,10 @@
 三套视觉主题：**Paper**（暖调纸感）、**Midnight**（深色开发者）、**Indigo**（清爽 SaaS）。
 
 ## 功能（按版本）
+
+### 1.2.2（左侧编辑区图表入口）
+
+- **在左侧编辑区编辑任意图表**：光标进入任意图表代码块（画布类 ` ```zdiagram ` 与表单类 ` ```mermaid `：饼图 / 甘特图 / 时序图等）时，顶部浮出 **「当前X · ✎ 编辑 / 🗑 删除」**——修复了此前**只有 ` ```zdiagram ` 会触发、` ```mermaid ` 图表在左侧编辑时没有编辑入口**的问题。编辑条会按图类型标注（当前饼图 / 当前甘特图…），点编辑反解回工作台可视化重编。
 
 ### 1.2.1（图表编辑入口 + 表单类二次编辑）
 
